@@ -16,7 +16,7 @@ OUTPUT_DIR = "downloads"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # === Inisialisasi FastAPI ===
-app = FastAPI(title="🎬 Lightweight YouTube Converter AP")
+app = FastAPI(title="🎬 Lightweight YouTube Converter API")
 app.mount("/downloads", StaticFiles(directory=OUTPUT_DIR), name="downloads")
 
 # === CORS ===
@@ -39,7 +39,7 @@ def mark_active():
 # === ROUTE UTAMA ===
 @app.get("/")
 async def root():
-    return JSONResponse({"status": "success", "message": "🎬 YouTube Converter API aktif"}, status_code=200)
+    return JSONResponse({"status": "success", "message": "🎬 Lightweight YouTube Converter API aktif"}, status_code=200)
 
 # === AUDIO CONVERTER ===
 @app.get("/convert/audio")

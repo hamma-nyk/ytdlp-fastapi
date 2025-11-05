@@ -52,6 +52,11 @@ async def convert_audio(url: str = Query(..., description="URL YouTube")):
         output_file = temp_file.replace(".webm", ".mp3")
 
         # Unduh audio menggunakan yt-dlp
+        class QuietLogger:
+            def debug(self, msg): pass
+            def warning(self, msg): pass
+            def error(self, msg): pass
+            
         ydl_opts = {
             'cookiefile': 'cookies.txt',  # opsional, hapus jika tidak perlu
             "format": "bestaudio[ext=webm]/bestaudio/best",
@@ -62,6 +67,8 @@ async def convert_audio(url: str = Query(..., description="URL YouTube")):
             "nocheckcertificate": True,
             "geo_bypass": True,
             "skip_download": False,
+            "progress_hooks": [],
+            "logger": QuietLogger()
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -103,6 +110,11 @@ async def convert_video(url: str = Query(..., description="URL YouTube")):
         temp_file = os.path.join(OUTPUT_DIR, file_name)
         output_file = temp_file.replace(".webm", ".mp4")
 
+        class QuietLogger:
+            def debug(self, msg): pass
+            def warning(self, msg): pass
+            def error(self, msg): pass
+        
         ydl_opts = {
             'cookiefile': 'cookies.txt',  # opsional
             "format": "bestvideo[height<=480]+bestaudio/best",  # maksimal 480p (hemat bandwidth)
@@ -114,6 +126,8 @@ async def convert_video(url: str = Query(..., description="URL YouTube")):
             "nocheckcertificate": True,
             "geo_bypass": True,
             "skip_download": False,
+            "progress_hooks": [], 
+            "logger": QuietLogger()
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:

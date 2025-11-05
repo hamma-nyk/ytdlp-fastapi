@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Response
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,7 +17,11 @@ OUTPUT_DIR = "downloads"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # === Inisialisasi FastAPI ===
-app = FastAPI(title="🎬 Lightweight YouTube Converter API")
+app = FastAPI(
+        title="🎬 Lightweight YouTube Converter API",
+        docs_url=None,   # matikan default FastAPI docs
+        redoc_url=None
+    )
 # app.mount("/downloads", StaticFiles(directory=OUTPUT_DIR), name="downloads")
 
 # === CORS ===
@@ -40,7 +44,39 @@ def mark_active():
 # === ROUTE UTAMA ===
 @app.get("/")
 async def root():
-    return JSONResponse({"status": "success", "message": "🎬 Lightweight YouTube Converter API aktif"}, status_code=200)
+    return JSONResponse({"status": "success", "message": "🎬 Lightweight YouTube Converter API aktif, buka /docs untuk melihat dokumentasi."}, status_code=200)
+
+@app.get("/docs", include_in_schema=False)
+def custom_swagger_ui():
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Swagger UI</title>
+      <link rel="stylesheet" type="text/css"
+        href="https://cdn.jsdelivr.net/npm/swagger-ui-dist/swagger-ui.css" />
+      <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist/swagger-ui-bundle.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist/swagger-ui-standalone-preset.js"></script>
+    </head>
+    <body>
+      <div id="swagger-ui"></div>
+      <script>
+        window.onload = function() {
+          const ui = SwaggerUIBundle({
+            url: '/openapi.json',
+            dom_id: '#swagger-ui',
+            presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+            layout: 'BaseLayout',
+            deepLinking: true,
+          });
+          window.ui = ui;
+        };
+      </script>
+    </body>
+    </html>
+    """
+    return Response(content=html_content, media_type="text/html")
 
 # === AUDIO CONVERTER ===
 @app.get("/convert/audio")
@@ -212,6 +248,6 @@ threading.Thread(target=auto_clean, daemon=True).start()
 threading.Thread(target=keep_alive, daemon=True).start()
 
 # === UNTUK LOCAL TESTING ===
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="0.0.0.0", port=8000)
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

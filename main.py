@@ -2,6 +2,7 @@ from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 import yt_dlp
 import ffmpeg
 import os
@@ -146,7 +147,19 @@ async def convert_video(url: str = Query(..., description="URL YouTube")):
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
-
+@app.get("/downloads/{filename}")
+async def download_file(filename: str):
+    path = os.path.join(OUTPUT_DIR, filename)
+    if not os.path.exists(path):
+        return JSONResponse({"error": "File not found"}, status_code=404)
+    
+    return FileResponse(
+        path,
+        media_type="application/octet-stream",
+        filename=filename,  # paksa browser download
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+    
 # === AUTO DELETE FILE SETIAP 30 MENIT ===
 def auto_clean():
     while True:
@@ -182,6 +195,6 @@ threading.Thread(target=auto_clean, daemon=True).start()
 threading.Thread(target=keep_alive, daemon=True).start()
 
 # === UNTUK LOCAL TESTING ===
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="0.0.0.0", port=8000)
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

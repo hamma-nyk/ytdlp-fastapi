@@ -24,6 +24,7 @@ async def convert_audio(url: str = Query(..., description="URL YouTube")):
         
         # Ambil info YouTube tanpa download file
         ydl_opts = {
+            'cookiefile': 'cookies.txt',
             "format": "bestaudio/best",
             "outtmpl": temp_file,
             "quiet": True
@@ -59,6 +60,7 @@ async def convert_video(url: str = Query(..., description="URL YouTube")):
         
         # Ambil info YouTube tanpa download file
         ydl_opts = {
+            'cookiefile': 'cookies.txt',
             "format": "bestvideo+bestaudio/best",
             "outtmpl": temp_file,
             "quiet": True,

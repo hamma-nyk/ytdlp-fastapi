@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 import yt_dlp
 import ffmpeg
 import os
@@ -8,19 +9,18 @@ import uuid
 import threading
 import time
 import requests
-from fastapi.middleware.cors import CORSMiddleware
 
-origins = [
-    "*",  # bisa diganti jadi spesifik: ["https://myytapp.vercel.app"]
-]
 
 # === Direktori download ===
 OUTPUT_DIR = "downloads"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # === Inisialisasi FastAPI ===
-app = FastAPI(title="🎬 YouTube Converter API")
+app = FastAPI(title="🎬 Lightweight YouTube Converter AP")
 app.mount("/downloads", StaticFiles(directory=OUTPUT_DIR), name="downloads")
+
+# === CORS ===
+origins = ["*"] # bisa diganti jadi spesifik: ["https://myytapp.vercel.app"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -29,6 +29,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# === Variabel global untuk kontrol aktivitas ===
+last_active = time.time()
+
+def mark_active():
+    global last_active
+    last_active = time.time()
+    
 # === ROUTE UTAMA ===
 @app.get("/")
 async def root():
@@ -37,6 +44,7 @@ async def root():
 # === AUDIO CONVERTER ===
 @app.get("/convert/audio")
 async def convert_audio(url: str = Query(..., description="URL YouTube")):
+    mark_active()
     try:
         file_name = f"{uuid.uuid4()}.webm"
         temp_file = os.path.join(OUTPUT_DIR, file_name)
@@ -45,9 +53,14 @@ async def convert_audio(url: str = Query(..., description="URL YouTube")):
         # Unduh audio menggunakan yt-dlp
         ydl_opts = {
             'cookiefile': 'cookies.txt',  # opsional, hapus jika tidak perlu
-            "format": "bestaudio/best",
+            "format": "bestaudio[ext=webm]/bestaudio/best",
             "outtmpl": temp_file,
-            "quiet": True
+            "quiet": True,
+            "noplaylist": True,
+            "no_warnings": True,
+            "nocheckcertificate": True,
+            "geo_bypass": True,
+            "skip_download": False,
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -58,7 +71,12 @@ async def convert_audio(url: str = Query(..., description="URL YouTube")):
         (
             ffmpeg
             .input(temp_file)
-            .output(output_file, format="mp3", acodec="libmp3lame", audio_bitrate="192k")
+            .output(output_file,
+                    format="mp3",
+                    acodec="libmp3lame",
+                    audio_bitrate="128k",
+                    preset="ultrafast",
+                    threads=1)
             .overwrite_output()
             .run(quiet=True)
         )
@@ -78,6 +96,7 @@ async def convert_audio(url: str = Query(..., description="URL YouTube")):
 # === VIDEO CONVERTER ===
 @app.get("/convert/video")
 async def convert_video(url: str = Query(..., description="URL YouTube")):
+    mark_active()
     try:
         file_name = f"{uuid.uuid4()}.webm"
         temp_file = os.path.join(OUTPUT_DIR, file_name)
@@ -85,10 +104,15 @@ async def convert_video(url: str = Query(..., description="URL YouTube")):
 
         ydl_opts = {
             'cookiefile': 'cookies.txt',  # opsional
-            "format": "bestvideo+bestaudio/best",
+            "format": "bestvideo[height<=480]+bestaudio/best",  # maksimal 480p (hemat bandwidth)
             "outtmpl": temp_file,
             "quiet": True,
             "merge_output_format": "webm",
+            "noplaylist": True,
+            "no_warnings": True,
+            "nocheckcertificate": True,
+            "geo_bypass": True,
+            "skip_download": False,
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -99,7 +123,13 @@ async def convert_video(url: str = Query(..., description="URL YouTube")):
         (
             ffmpeg
             .input(temp_file)
-            .output(output_file, format="mp4", vcodec="libx264", acodec="aac")
+            .output(output_file,
+                    format="mp4",
+                    vcodec="libx264",
+                    acodec="aac",
+                    preset="ultrafast",   # CPU rendah
+                    crf=32,               # kualitas lebih kecil ukuran
+                    threads=1)
             .overwrite_output()
             .run(quiet=True)
         )
@@ -123,29 +153,35 @@ def auto_clean():
         now = time.time()
         for f in os.listdir(OUTPUT_DIR):
             path = os.path.join(OUTPUT_DIR, f)
-            if os.path.isfile(path) and now - os.path.getmtime(path) > 1800:  # 1800 detik = 30 menit
+            if os.path.isfile(path) and now - os.path.getmtime(path) > 1800:
                 try:
                     os.remove(path)
                     print(f"🗑️ Deleted old file: {f}")
                 except Exception as e:
                     print(f"⚠️ Gagal hapus {f}: {e}")
-        time.sleep(300)  # cek setiap 5 menit
+        time.sleep(600)  # cek tiap 5 menit
 
-# === AUTO KEEP-ALIVE UNTUK MENCEGAH SLEEP DI RENDER ===
+# === SMART KEEP-ALIVE ===
 def keep_alive():
+    global last_active
+    url = "https://ytdlp-fastapi-q05w.onrender.com/"  # ganti dengan URL render kamu
     while True:
-        try:
-            requests.get("https://ytdlp-fastapi-q05w.onrender.com/")  # ganti URL kamu di sini
-            print("🔄 Keep-alive ping sent")
-        except:
-            print("⚠️ Gagal ping")
-        time.sleep(300)  # setiap 5 menit
+        # Kalau aktif dalam 15 menit terakhir → kirim ping
+        if time.time() - last_active < 900:
+            try:
+                requests.get(url)
+                print("🔄 Keep-alive ping sent (active)")
+            except Exception as e:
+                print("⚠️ Gagal ping:", e)
+        else:
+            print("💤 Idle mode, skip ping (biar hemat jam).")
+        time.sleep(300)
 
 # === JALANKAN THREADS OTOMATIS ===
 threading.Thread(target=auto_clean, daemon=True).start()
 threading.Thread(target=keep_alive, daemon=True).start()
 
-# # === UNTUK LOCAL TESTING ===
+# === UNTUK LOCAL TESTING ===
 # if __name__ == "__main__":
 #     import uvicorn
 #     uvicorn.run(app, host="0.0.0.0", port=8000)

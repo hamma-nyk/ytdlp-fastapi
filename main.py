@@ -18,7 +18,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # === Inisialisasi FastAPI ===
 app = FastAPI(title="🎬 Lightweight YouTube Converter API")
-app.mount("/downloads", StaticFiles(directory=OUTPUT_DIR), name="downloads")
+# app.mount("/downloads", StaticFiles(directory=OUTPUT_DIR), name="downloads")
 
 # === CORS ===
 origins = ["*"] # bisa diganti jadi spesifik: ["https://myytapp.vercel.app"]
@@ -157,7 +157,10 @@ async def download_file(filename: str):
         path,
         media_type="application/octet-stream",
         filename=filename,  # paksa browser download
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Cache-Control": "public, max-age=3600"
+        }
     )
     
 # === AUTO DELETE FILE SETIAP 30 MENIT ===
